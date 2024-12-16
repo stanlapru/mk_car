@@ -24,6 +24,14 @@ class MyApp extends StatelessWidget {
           colorScheme: Theme.of(context)
               .colorScheme
               .copyWith(outline: Colors.blue, primary: Colors.blue)),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ).copyWith(
+          colorScheme: Theme.of(context)
+              .colorScheme
+              .copyWith(outline: Colors.blue, primary: Colors.blue)),
       home: const BluetoothJoystickPage(),
     );
   }
@@ -43,15 +51,16 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
   BluetoothCharacteristic? writeCharacteristic;
   List<BluetoothDevice> devicesList = [];
   Timer? refreshTimer;
-  Timer? flashTimer;
+  Timer? emergencyFlashTimer;
 
   double xCoordinate = 0;
   double yCoordinate = 0;
-  bool whiteLedState = false;
-  bool yellowLedState = false;
   bool isBluetoothOn = false;
   bool isLocationOn = false;
-  bool flashLedTrigger = false;
+  bool whiteLedState = false;
+  bool leftYellowLedState = false;
+  bool rightYellowLedState = false;
+  bool emergencyFlashing = false;
 
   @override
   void initState() {
@@ -175,20 +184,27 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
     }
   }
 
-  void toggleFlashLed(bool state) {
+  void toggleEmergencyFlashing(bool state) {
     if (state) {
-      flashTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
+      emergencyFlashTimer =
+          Timer.periodic(const Duration(milliseconds: 500), (timer) {
         setState(() {
-          yellowLedState = !yellowLedState;
+          leftYellowLedState = !leftYellowLedState;
+          rightYellowLedState = !rightYellowLedState;
         });
-        sendLedState("LED_YELLOW", yellowLedState);
+
+        sendLedState("LEFT_YELLOW_LED", leftYellowLedState);
+        sendLedState("RIGHT_YELLOW_LED", rightYellowLedState);
       });
     } else {
-      flashTimer?.cancel();
+      emergencyFlashTimer?.cancel();
       setState(() {
-        yellowLedState = false;
+        leftYellowLedState = false;
+        rightYellowLedState = false;
       });
-      sendLedState("LED_YELLOW", false);
+
+      sendLedState("LEFT_YELLOW_LED", false);
+      sendLedState("RIGHT_YELLOW_LED", false);
     }
   }
 
@@ -203,14 +219,44 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
   void dispose() {
     connectedDevice?.disconnect();
     refreshTimer?.cancel();
-    flashTimer?.cancel();
+    emergencyFlashTimer?.cancel();
     super.dispose();
   }
+
+  final WidgetStateProperty<Icon?> thumbIconRight =
+      WidgetStateProperty.resolveWith<Icon?>(
+    (Set<WidgetState> states) {
+      return const Icon(Icons.turn_right);
+    },
+  );
+
+  final WidgetStateProperty<Icon?> thumbIconLeft =
+      WidgetStateProperty.resolveWith<Icon?>(
+    (Set<WidgetState> states) {
+      return const Icon(Icons.turn_left);
+    },
+  );
+
+  final WidgetStateProperty<Icon?> thumbIconEmergency =
+      WidgetStateProperty.resolveWith<Icon?>(
+    (Set<WidgetState> states) {
+      return const Icon(Icons.warning_amber_rounded);
+    },
+  );
+
+  final WidgetStateProperty<Icon?> thumbIconHeadlights =
+      WidgetStateProperty.resolveWith<Icon?>(
+    (Set<WidgetState> states) {
+      return const Icon(Icons.lightbulb);
+    },
+  );
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         title: const Text('Панель управления'),
       ),
       body: Column(
@@ -229,16 +275,22 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 if (!isBluetoothOn)
-                                  const Text(
+                                  Text(
                                     'Bluetooth не включен.',
                                     style: TextStyle(
-                                        fontSize: 18, color: Colors.red),
+                                        fontSize: 18,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error),
                                   ),
                                 if (!isLocationOn)
-                                  const Text(
+                                  Text(
                                     'Геолокация не включена.',
                                     style: TextStyle(
-                                        fontSize: 18, color: Colors.red),
+                                        fontSize: 18,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error),
                                   ),
                               ],
                             ),
@@ -248,16 +300,16 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
                               const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const SizedBox(
+                                    SizedBox(
                                       height: 16.0,
                                       width: 16.0,
                                       child: Center(
                                           child: CircularProgressIndicator()),
                                     ),
-                                    const SizedBox(
+                                    SizedBox(
                                       width: 16,
                                     ),
-                                    const Text(
+                                    Text(
                                       'Список устройств',
                                       style: TextStyle(fontSize: 20),
                                     ),
@@ -292,9 +344,22 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
                                     // }
 
                                     return ListTile(
-                                      title: Text(deviceName),
-                                      subtitle:
-                                          Text(device.remoteId.toString()),
+                                      title: Text(
+                                        deviceName,
+                                        style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        device.remoteId.toString(),
+                                        style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                      ),
                                       onTap: () => connectToDevice(device),
                                     );
                                   },
@@ -335,9 +400,10 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
             children: [
               Column(
                 children: [
-                  const Text('Белый LED', style: TextStyle(fontSize: 16)),
+                  const Text('Фары', style: TextStyle(fontSize: 16)),
                   Switch(
                     value: whiteLedState,
+                    thumbIcon: thumbIconHeadlights,
                     onChanged: (value) {
                       setState(() {
                         whiteLedState = value;
@@ -347,56 +413,79 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
                   ),
                 ],
               ),
-              const SizedBox(width: 40),
+              const SizedBox(width: 20),
               Column(
                 children: [
-                  const Text('Жёлтый LED', style: TextStyle(fontSize: 16)),
+                  const Text('Влево', style: TextStyle(fontSize: 16)),
                   Switch(
-                    value: yellowLedState,
+                    value: leftYellowLedState,
+                    thumbIcon: thumbIconLeft,
                     onChanged: (value) {
                       setState(() {
-                        yellowLedState = value;
+                        leftYellowLedState = value;
                       });
-                      sendLedState("LED_YELLOW", value);
+                      sendLedState("LEFT_YELLOW_LED", value);
                     },
                   ),
                 ],
               ),
-              const SizedBox(width: 40),
+              const SizedBox(width: 20),
               Column(
                 children: [
-                  const Text('Аварийка', style: TextStyle(fontSize: 16)),
+                  const Text('Вправо', style: TextStyle(fontSize: 16)),
                   Switch(
-                    value: yellowLedState,
+                    thumbIcon: thumbIconRight,
+                    value: rightYellowLedState,
                     onChanged: (value) {
                       setState(() {
-                        yellowLedState = value;
+                        rightYellowLedState = value;
                       });
-                      toggleFlashLed(value);
+                      sendLedState("RIGHT_YELLOW_LED", value);
                     },
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Column(
+          const SizedBox(width: 40),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('Сигнал', style: TextStyle(fontSize: 16)),
-              ElevatedButton(
-                onPressed: null,
-                style: ButtonStyle(
-                  backgroundColor: WidgetStateProperty.all(Colors.blue),
-                ),
-                child: GestureDetector(
-                  onTapDown: (_) {
-                    sendSoundCommand(true);
-                  },
-                  onTapUp: (_) {
-                    sendSoundCommand(false);
-                  },
-                  child: const Text("Держите"),
-                ),
+              Column(
+                children: [
+                  const Text('Аварийка', style: TextStyle(fontSize: 16)),
+                  Switch(
+                    thumbIcon: thumbIconEmergency,
+                    value: emergencyFlashing,
+                    onChanged: (value) {
+                      setState(() {
+                        emergencyFlashing = value;
+                      });
+                      toggleEmergencyFlashing(value);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Column(
+                children: [
+                  const Text('Сигнал', style: TextStyle(fontSize: 16)),
+                  ElevatedButton(
+                    onPressed: null,
+                    style: ButtonStyle(
+                      backgroundColor: WidgetStateProperty.all(Colors.blue),
+                    ),
+                    child: GestureDetector(
+                      onTapDown: (_) {
+                        sendSoundCommand(true);
+                      },
+                      onTapUp: (_) {
+                        sendSoundCommand(false);
+                      },
+                      child: const Text("Держите"),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
