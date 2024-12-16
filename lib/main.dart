@@ -43,6 +43,7 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
   BluetoothCharacteristic? writeCharacteristic;
   List<BluetoothDevice> devicesList = [];
   Timer? refreshTimer;
+  Timer? flashTimer;
 
   double xCoordinate = 0;
   double yCoordinate = 0;
@@ -50,6 +51,7 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
   bool yellowLedState = false;
   bool isBluetoothOn = false;
   bool isLocationOn = false;
+  bool flashLedTrigger = false;
 
   @override
   void initState() {
@@ -173,6 +175,23 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
     }
   }
 
+  void toggleFlashLed(bool state) {
+    if (state) {
+      flashTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
+        setState(() {
+          yellowLedState = !yellowLedState;
+        });
+        sendLedState("LED_YELLOW", yellowLedState);
+      });
+    } else {
+      flashTimer?.cancel();
+      setState(() {
+        yellowLedState = false;
+      });
+      sendLedState("LED_YELLOW", false);
+    }
+  }
+
   void sendSoundCommand(bool state) async {
     if (writeCharacteristic != null) {
       String message = "SOUND:${state ? 1 : 0}\n";
@@ -184,6 +203,7 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
   void dispose() {
     connectedDevice?.disconnect();
     refreshTimer?.cancel();
+    flashTimer?.cancel();
     super.dispose();
   }
 
@@ -197,7 +217,7 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            height: 400,
+            height: 290,
             padding: const EdgeInsets.all(8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,36 +245,34 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
                           )
                         : Column(
                             children: [
-                              Center(
-                                child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const SizedBox(
-                                        height: 16.0,
-                                        width: 16.0,
-                                        child: Center(
-                                            child: CircularProgressIndicator()),
-                                      ),
-                                      const SizedBox(
-                                        width: 16,
-                                      ),
-                                      const Text(
-                                        'Список устройств',
-                                        style: TextStyle(fontSize: 20),
-                                      ),
-                                      const SizedBox(
-                                        width: 8,
-                                      ),
-                                      TextButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              devicesList.clear();
-                                            });
-                                            startScan();
-                                          },
-                                          child: const Text("Обновить")),
-                                    ]),
-                              ),
+                              const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const SizedBox(
+                                      height: 16.0,
+                                      width: 16.0,
+                                      child: Center(
+                                          child: CircularProgressIndicator()),
+                                    ),
+                                    const SizedBox(
+                                      width: 16,
+                                    ),
+                                    const Text(
+                                      'Список устройств',
+                                      style: TextStyle(fontSize: 20),
+                                    ),
+                                    // const SizedBox(
+                                    //   width: 8,
+                                    // ),
+                                    // TextButton(
+                                    //     onPressed: () {
+                                    //       setState(() {
+                                    //         devicesList.clear();
+                                    //       });
+                                    //       startScan();
+                                    //     },
+                                    //     child: const Text("Обновить")),
+                                  ]),
                               const SizedBox(height: 20),
                               SizedBox(
                                 height: 200,
@@ -347,23 +365,38 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
               const SizedBox(width: 40),
               Column(
                 children: [
-                  const Text('Сигнал', style: TextStyle(fontSize: 16)),
-                  ElevatedButton(
-                    onPressed: null,
-                    style: ButtonStyle(
-                      backgroundColor: WidgetStateProperty.all(Colors.blue),
-                    ),
-                    child: GestureDetector(
-                      onTapDown: (_) {
-                        sendSoundCommand(true);
-                      },
-                      onTapUp: (_) {
-                        sendSoundCommand(false);
-                      },
-                      child: const Text("Держите"),
-                    ),
+                  const Text('Аварийка', style: TextStyle(fontSize: 16)),
+                  Switch(
+                    value: yellowLedState,
+                    onChanged: (value) {
+                      setState(() {
+                        yellowLedState = value;
+                      });
+                      toggleFlashLed(value);
+                    },
                   ),
                 ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Column(
+            children: [
+              const Text('Сигнал', style: TextStyle(fontSize: 16)),
+              ElevatedButton(
+                onPressed: null,
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.all(Colors.blue),
+                ),
+                child: GestureDetector(
+                  onTapDown: (_) {
+                    sendSoundCommand(true);
+                  },
+                  onTapUp: (_) {
+                    sendSoundCommand(false);
+                  },
+                  child: const Text("Держите"),
+                ),
               ),
             ],
           ),
