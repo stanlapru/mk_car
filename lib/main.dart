@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Bluetooth Joystick',
+      title: 'Панель управления',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
@@ -126,7 +126,6 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
     FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
 
     FlutterBluePlus.scanResults.listen((results) {
-      print('listening...');
       for (ScanResult result in results) {
         if (!devicesList
             .any((device) => device.remoteId == result.device.remoteId)) {
@@ -153,6 +152,15 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
 
     setState(() {
       connectedDevice = device;
+    });
+
+    device.connectionState.listen((state) {
+      if (state == BluetoothConnectionState.disconnected) {
+        setState(() {
+          connectedDevice = null;
+          writeCharacteristic = null;
+        });
+      }
     });
 
     List<BluetoothService> services = await device.discoverServices();
@@ -347,9 +355,10 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
                                       title: Text(
                                         deviceName,
                                         style: TextStyle(
+                                          fontWeight: FontWeight.w800,
                                           color: Theme.of(context)
                                               .colorScheme
-                                              .onPrimary,
+                                              .onSurfaceVariant,
                                         ),
                                       ),
                                       subtitle: Text(
@@ -392,7 +401,7 @@ class _BluetoothJoystickPageState extends State<BluetoothJoystickPage> {
           const SizedBox(height: 20),
           Text(
             'X: ${xCoordinate.toStringAsFixed(1)}, Y: ${yCoordinate.toStringAsFixed(1)}',
-            style: const TextStyle(fontSize: 16, color: Colors.black),
+            style: const TextStyle(fontSize: 16,),
           ),
           const SizedBox(height: 20),
           Row(
